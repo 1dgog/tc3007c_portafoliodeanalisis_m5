@@ -1,9 +1,9 @@
 ---
-title: "Venta de televisores"
-author: "Javier de Golferichs García A01139500"
-date: "29 de noviembre de 2022"
-bibliography: ref_televisores.bib
-output: 
+title: "Los peces y el mercurio"
+author: "Javier de Golferichs García (A01139500)"
+date: "30 de octubre de 2022"
+bibliography: ref_mercurio.bib
+output:
   pdf_document:
     number_sections: yes
     toc: yes
@@ -11,185 +11,156 @@ output:
   html_document:
     toc: yes
     df_print: paged
-abstract: 'Se realizo un análisis de series de tiempo para la venta de televisores durante 4 años divididas por trimestre. Con esta se evalúa el modelo lineal de la tendencia, así como la validez de la serie de tiempo y los pronósticos hechos con base en estos.'
+abstract: 'La contaminación por mercurio en lagos puede tener efectos negativos en la salud humana en caso de ingerir peces provenientes de aquellos lagos en donde la concentración sea lo suficientemente alta.
+Los métodos y tecnicas estadísticas usadas en el reporte incluyen un análisis de normalidad mediante la prueba de Anderson Darling, para analizar normalidad multivariada entre variables y evaluar el sesgo y curtosis de estas. En la segunda parte se usa un análisis de componentes principales, 
+Se encontró que si existe normalidad multivariada entre X4 y X10.'
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r include=FALSE}
+library("MVN")
+library("corrplot")
+library("mnormt")
+library(FactoMineR)
+library(factoextra)
+library(ggplot2) 
+```
+
+
+```{r carga_de_datos, echo=FALSE, warning=FALSE}
+M <- read.csv("mercurio.csv")
+```
+
 # Introducción
 
-Las series de tiempo sirven para examinar tendencias y ciclos presentes en eventos temporalmente dependientes.
+Se realizó un estudio sobre la concentración de mercurio en varios lagos de Florida y otras variables relevantes a esta.
 
-En este documento, se hace uso de estas para explorar su utilidad al aplicarlas a eventos de temporada como la venta de televisores divididas por trimestre, a un plazo de 4 años.
+Este problema es importante pues contribuye a explicar los factores que influyen en la contaminación por mercurio que puede afectar la salud de los consumidores.
 
-Los métodos utilizados son la descomposición de los datos en sus componentes de esquema multiplicativo, regresión lineal del modelo y análisis de este mismo a traves de pruebas de hipótesis, análisis de residuos y de normalidad. 
+Este documento presenta un análisis de normalidad de las variables para encontrar aquellas que tienen normalidad multivariada, así como de PCA para hacer agrupación de variables y reducir su complejidad al analizarlo.
 
-Finalmente se hace el cálculo de los errores porcentuales de las predicciones de la serie de tiempo así como su gráfico.
-
-\newpage
+Al final se presentan las conclusiones del estudio, así como el repositorio en donde se encuentra el código y las referencias utilizadas.
 
 # Análisis de resultados
 
-```{r datos, echo=FALSE}
-trimestre <- 1:16
-ventas_miles <- c(4.8,	4.1,	6.0,	6.5,	5.8,	5.2,	6.8,	7.4,	6.0,	5.6,	7.5,	7.8,	6.3,	5.9,	8.0,	8.4)
-D <- data.frame(trimestre,ventas_miles)
+En esta sección se presenta un análisis de normalidad multivariada y el análisis de componentes principales.
+
+## Análisis de normalidad
+
+Observese a continuación la prueba Anderson Darling aplicada a las variables X3 a X11, para encontrar variables con normalidad univariada.
+
+```{r, echo=FALSE}
+M_q <- M[,3:11]
+mvn_kt_y_se <- mvn(M_q,subset = NULL,
+                   mvn = "mardia", 
+                   covariance = FALSE,
+                   showOutliers = FALSE)
+mvn_kt_y_se$univariateNormality
 ```
 
-## Disperción de datos y observaciones preliminares
+Con base en lo anterior, se explora si las variables X4 y X10 tienen normalidad multivariada, para lo cual se aplica la prueba de Mardia, y detectar normalidad multivariada en este grupo.
 
-En la figura \ref{fig:ventas_trimestre} se observa que tiene una tendencia ascendente con ciclos que se repiten cada cuatro trimestres. En esta la ecuación de la recta que se sigue es y = 4.8525 + 0.1799*trimestre.
-
-```{r grafica_ventas, echo=FALSE, fig.cap="\\label{fig:ventas_trimestre}Dispersión de datos en azul y tendencia de regresión lineal en rojo.", fig.align = 'center', out.width="50%"}
-plot(trimestre, 
-     ventas_miles, 
-     type="o", 
-     col="blue", 
-     main = "Ventas por trimestre", 
-     xlab="Trimestre", 
-     ylab="Ventas de televisores (x10^3)",
-     xlim=c(1, 16))
-N = lm(ventas_miles~trimestre)
-abline(N,col="red")
+```{r, echo=FALSE}
+mvn_kt_y_se1 <- mvn(data.frame(M$X4, M$X10),
+                    subset = NULL,
+                    mvn = "mardia", 
+                    covariance = FALSE,
+                    showOutliers = TRUE)
+mvn_kt_y_se1
 ```
 
-## Decomposición en componentes
+En la columna de resultado, se observa que efectivamente si se cuenta con normalidad multivariada.
 
-Con base en lo anterior, se hace un análisis de tendencia y estacionalidad al descomponer la visualización en sus tres componentes de un esquema multiplicativo, obtenido en la figura \ref{fig:decomposicion}
+### Gráfica de contorno de normal multivariada previa.
 
-```{r decomposicion, echo=FALSE, fig.cap="\\label{fig:decomposicion}Decomposición multiplicativa de series de tiempo en tendencia, ciclos, y aleatoriedad", fig.align = 'center', out.width="50%"}
-x= ts(ventas_miles, frequency = 4)
-Tr = decompose(x, type = "m")
-plot(Tr, col ="blue")
+Notese el sesgo del diagrama de contorno presente en la figura \ref{fig:contorno}, el cual al estar cargado a la derecha, se interpreta como la presencia de sesgo a la izquierda, lo cual también se observa en la figura \ref{fig:outliers}. Las elipsoides también confirman la presencia de curtosis como observado en la prueba de Mardia, realizada en la sección anterior.
+
+
+```{r contorno, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:contorno}Gráfica de contorno de X4 y X10", fig.align = 'center', out.height="30%"}
+mvn_pl <- mvn(data.frame(M$X4, M$X10),
+               subset = NULL,
+               mvn = "mardia",
+               covariance = FALSE,
+               showOutliers = FALSE,
+               multivariatePlot = "contour")
 ```
 
-## Modelo lineal de tendencia
+### Detección de datos atípicos en la normal multivariada
 
-Se procede ahora a analizar el modelo lineal de la tendencia, para lo cualse dibuja la recta con las ventas desestacionalizdas.
+Para la detectar los datos atípicos se uso un gráfico de QQplot multivariado y la distancia de Mahalanobis.
 
-```{r ventas_des, echo=FALSE}
-ventas_desestacionalizadas <- (Tr$x)/(Tr$seasonal)
+```{r outliers, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:outliers}Datos atípicos en QQplot", fig.align = 'center', out.height="30%"}
+mvn_pl3 <- mvn(data.frame(M$X4, M$X10),
+               subset = NULL,
+               mvn = "hz",
+               covariance = FALSE,
+               multivariateOutlierMethod = "adj")
 ```
 
-```{r graf_ventas_desestacionalizadas, echo=FALSE, fig.cap="\\label{fig:graf_ventas_desestacionalizadas}Ventas desestacionalizadas contra tiempo con regresión lineal en rojo.", fig.align = 'center', out.width="50%"}
-N3 <- lm(ventas_desestacionalizadas~trimestre)
-plot(trimestre, ventas_desestacionalizadas, type = "l", xlab = "Trimestre", ylab = "Ventas desestacionalizadas")
-abline(N3, col = "red")
-text(6, 7, " ventas = 5.1080 + 0.1474 trimestre")
+Se observa en la figura \ref{fig:outliers} que el QQ-plot no tiene una pendiente de 1, por lo que se asume que, como fue visto en la prueba de Mardia, los datos padecen de sesgo y curtosis.
+
+Si, bien podría hacerse una transformación para lograr que se asemejen más a una recta de pendiente 1, la siguiente sección no debe ser elaborada con datos transformados, sino los originales.
+
+
+## Análisis de componentes principales
+
+El método de componentes principales (PCA) busca reducir la dimensionalidad de un problema al agrupar variables que provocan cierto comportamiento en el modelo, asegurando la ortogonalidad de las componentes, tal que estas son independientes entre si. [@Johnson2016]
+
+### Justificación para usar PCA
+
+El análisis de PCA será aplicado al grupo de las variables X3 a X11 (variables numéricas no categóricas), con la intención de agrupar características que influyen en el modelo y reducir la dimensionalidad y por ende complejidad de este.
+
+Recuerdese que para aplicar PCA no se requiere que las variables en cuestión sean normales, sin embargo la existencia de normalidad si enriquece el análisis, pues como tal PCA no asegura normalidad en las componentes pero si ortogonalidad.
+
+### Gráfico de vectores asociados a variables y puntuaciones de las observaciones.
+
+
+```{r var_dot, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:pca}Aplicación de PCA a variables X3 a X11.s", fig.align = 'center', out.height="30%"}
+datos <- M_q
+cp3 = PCA(datos,graph=TRUE)
 ```
 
-### Pertenencia del modelo lineal
+En la figura \ref{fig:pca} se observa el PCA por variables, en donde se observa que se hay 2 grupos principales ubicados en los cuadrantes 1 y 2, y que la variable X8 no tiene mucha contribución.
 
-#### Significancia de $\beta_1$
+En este caso se observa que Dim 1, es la que separa estos dos grupos, donde el de la izquierda es por variables relacionadas con características del agua, y de la derecha con las que tienen que ver con la concentración del mercurio.
 
-Para verificar que tan bueno es el modelo se analiza la significancia de $\beta_1$, la variabilidad explicada por los modelos, análisis de los residuos y una prueba de normalidad.
+En la figura \ref{fig:puntuaciones} se observan las puntuaciones de las observaciones.
 
-Al usar un $\alpha =0.05$, se calcula $t_0$ y $t^*$, con lo cual se aplica una condición para verificar cual de los estadísticos es mayor.
-
-```{r significancia_beta1, echo = FALSE}
-alpha = 0.05
-t_0 = qt(alpha/2,length(D$ventas_miles)-2)
-t_ast = summary(lm(ventas_desestacionalizadas~trimestre))$coefficients[2,3]
-if (abs(t_0)<abs(t_ast)){
-cat('t* es mayor que t0\n')
-} else{
-cat('t* es menor que \n')
-}
-p_value <- summary(lm(ventas_desestacionalizadas~trimestre))
-p_value <- 4.248e-09
-if (alpha<p_value){
-cat('p-val es mayor que alpha\n')
-} else{
-cat('p-val es menor que alpha\n')
-}
+```{r puntuaciones, echo =FALSE, warning=FALSE, fig.cap="\\label{fig:puntuaciones}Puntuaciones de las observaciones.", fig.align = 'center', out.height="30%"}
+fviz_contrib(cp3, choice = c("var"))
 ```
 
-Se encuentra con el estadístico $t*$ que $\beta_1 \neq 0$ y que si es significativa dado que el valor p `r p_value`` es menor que $\alpha$.
+### PCA y justificación de número de componentes.
 
-#### Variabilidad explicada por el modelo
+Observese de la figura \ref{fig:inflexion} que el cambio de curvatura se da en la componente 2, por lo que se considera que se deben de usar las 2 primeras componentes. 
 
-La variabilidad explicada por el modelo es la $r$, la cual se encuentra con un `summary()` que es de $0.92$ para este caso.
-
-#### Análisis de residuos
-
-En la figura \ref{fig:residuos} siguiente gráfico de residuos se observa que estos no siguen una distribución particular. Se observa que no hay una distribución aparente por lo que se encuentra homocedasticidad.
-
-```{r residuos, echo= FALSE, fig.cap="\\label{fig:residuos}Gráfico de residuos con eje 0 en color azul. ", fig.align = 'center', out.width="50%"}
-plot(N3$fitted.values,
-     N3$residuals, main = "Gráfico de residuos")
-abline(h=0, col="blue")
+```{r, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:inflexion}Aplicación de PCA a variables X3 a X11.", fig.align = 'center', out.height="30%"}
+fviz_screeplot(cp3)
 ```
 
+### Interpretación y significancia de PCA
 
-#### Normalidad del modelo
+Se encontró que el PCA aplicado a este problema ayuda a reducir la dimensionalidad del modelo y por ende su complejidad, al también descartar variables de baja contribución como X8, y dividir en dos componentes de las que la primera esta relacionada con las variables relacionadas con mercurio y la segunda con aquellas características encontradas en el lago.
 
-Se usa una prueba de Anderson Darling para verificar la normalidad del modelo en donde la hipótesis nula es que la distribución normal es una buena apliximación a los datos del modelo [@Aslam2020], usando el vector de ventas desnormalizadas.
-
-```{r echo=FALSE}
-library(nortest)
-```
-
-```{r normalidad, echo = FALSE}
-p_value_ad <- ad.test(ventas_desestacionalizadas)
-```
-
-De la prueba de hipótesis se encuentra que al ser el valor p `0.4069` mayor que $\alpha$, no se rechaza la hipótesis nula, por lo que se si sigue una distibución normal.
-
-## Calculo de CME y EPAM de pronósticos
-
-```{r pronosticos, echo =FALSE}
-f = function(x) {5.1080 + 0.1474*x}
-a1 <- Tr$seasonal[1]
-a2 <- Tr$seasonal[2]
-a3 <- Tr$seasonal[3]
-a4 <- Tr$seasonal[4]
-p17<-f(17)*a1*1000
-p18<-f(18)*a2*1000
-p19<-f(19)*a3*1000
-p20<-f(20)*a4*1000
-pronosticos <- c(f(17)*a1, f(18)*a2, f(19)*a3,f(20)*a4)
-ventas_con_p <- c(ventas_miles, pronosticos)
-trimestre_con_p <- c(trimestre, 17, 18, 19, 20)
-```
-
-
-```{r error, echo=FALSE}
-N4 <- lm(ventas_con_p~trimestre_con_p)
-CME2 <- mean(N4$residuals, na.rm="TRUE")
-```
-
-Se encuentra que el error medio cuadrado de los valores de ventas de televisores con los pronósticos con respecto a la línea de tendencia es de `r CME2`, de lo cual se encuentra que es un error considerablemente pequeño.
-
-## Gráfico de pronósticos de ventas contra tiempo
-
-De la figura \ref{fig:ventas_pronosticos} se encuentra que sigue las componentes de tendencia ascendente y ciclica.
-
-```{r grafica_ventas_pronosticos, echo=FALSE, fig.cap="\\label{fig:ventas_pronosticos}Dispersión de datos originales con pronósticos.", fig.align = 'center', out.width="50%"}
-plot(trimestre_con_p, 
-     ventas_con_p, 
-     type="o", 
-     col="blue", 
-     main = "Ventas por trimestre", 
-     xlab="Trimestre", 
-     ylab="Ventas de televisores (x10^3)",
-     xlim=c(1, 20))
-N = lm(ventas_con_p~trimestre_con_p)
-abline(N,col="red")
-```
-
-De la nueva línea de tendencia que toma en consideración de los pronósticos se tiene la ecuación y = 4.8525+0.1799*trimestre, la cual es igual a la mostrada en la figura \ref{fig:ventas_trimestre}.
+El PCA ayuda también a simplificar el análisis en comparación al anterior, para el cual se tuvo que buscar correlaciones entre variables y hacer pruebas para encontrar cuales son las que tienen correlación para despues buscar nivel de influencia, mientras que en este basto con hacer la separación en componentes.
 
 # Conclusión
 
-Se concluye que las series de tiempo son útiles en aquellas aplicaciones que requieren pronosticar datos que han mostrado cierto patrón, en este caso de tipo tendencia y ciclo, con un error cuadrádo considerablemente pequeño.
+Este análisis contribuye a responder a la pregunta del estudio al encontrar que los principales factores que influyen en el nivel de contaminación por mercurio en los peces de los lagos de florida son la alcalinidad y el PH, obtenidos de la \ref{fig:puntuaciones}.
 
-Se logró evaluar y llegar a que el modelo lineal obtenido para la tendencia si es significativo, así como hacer pronósticos para el quinto año de ventas.
+La normalidad encontrada en las variables de PH y concentración máxima de mercurio facilitan responder la pregunta sobre la variable con mayor influencia en la concentración por mercurio, puesto que al tener una distribución normal multivariada involucra que estas dos estan correlacionadas.
+
+Los componentes principales ayudan a abordar este problema al agrupar diferentes variables en dos dimenciones para facilitar el análisis e interpretación del modelo.
+
+Se logró reducir el modelo a dos componentes agrupadas por categoría divididas por la dimensión 1, así como descartar la variable X8 por su baja contribución, con lo cual, en comparación de la entrega anterior, agiliza el análisis al descartar variables que no necesariamente deben ser tomadas en cuenta.
+
+Se considera óptimo que como próximas investigaciones se haga un análisis de causalidad de cada una de las variables de la componente 1 (alcalinidad, PH, etc.)
 
 # Anexos
 
-Liga al código en GitHub [https://github.com/1dgog/tc3007c_portafoliodeanalisis_m5/tree/main](https://github.com/1dgog/tc3007c_portafoliodeanalisis_m5/tree/main)
-
+Liga al código en GitHub [https://github.com/1dgog/tc3007_portafoliodeimplementacion_m5/blob/main/peces_mercurio.Rmd](https://github.com/1dgog/tc3007_portafoliodeimplementacion_m5/blob/main/peces_mercurio.Rmd)
 
 # Referencias bibliográficas
